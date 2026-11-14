@@ -10,22 +10,23 @@ Dual-plane explainer auditing Christian Lempa's Pulumi + Proxmox + Infisical
 homelab architecture (YouTube: WFyJ-xyJ58M). Static React/Vite/Three.js site on
 GitHub Pages + local Docker FastAPI backend with SQLite WAL + sqlite-vec + FTS5.
 
-STATIC MODE (GitHub Pages):
-  Works immediately at the live demo URL. Falls back to localStorage persistence
-  when no local backend is reachable.
+TWO WAYS TO USE IT
+------------------
+1. GitHub Pages (static mode, no install)
+   Visit https://swipswaps.github.io/pulumi-homelab-explainer/
+   Browsers block HTTP loopback probes from HTTPS pages (mixed content).
+   You will see a banner with an "Open Local Instance ->" button.
 
-LOCAL DOCKER MODE (full vector search):
-  1. docker compose up --build -d
-  2. curl http://127.0.0.1:8000/api/health   # should return {"status":"ok",...}
-  3. npm run dev                              # http://localhost:5173
-  4. The UI status badge will show "Docker Backend Detected".
+2. Local Instance (full Docker vector search)
+   a. docker compose up --build -d
+   b. npm run dev   # serves at http://localhost:5173
+   c. Open http://localhost:5173 - probe succeeds natively, no banner,
+      status badge shows "Docker Backend Detected (SQLite-Vec)".
 
-GITHUB PAGES DEPLOYMENT:
-  The workflow (.github/workflows/deploy.yml) uses actions/configure-pages,
-  actions/upload-pages-artifact, and actions/deploy-pages. It requires the
-  repository's Pages source to be set to "GitHub Actions" (one-time manual step
-  in Settings → Pages). The bootstrap script detects a 403 from gh api and prints
-  the correct instruction.
+If you must connect GitHub Pages to a remote backend, use an HTTPS tunnel
+(cloudflared tunnel --url http://localhost:8000) and paste the tunnel URL
+into the input field in the banner. But the "Open Local Instance ->" button
+is the intended path.
 
 DIRECTORY STRUCTURE:
   package.json, vite.config.js, tailwind.config.js, postcss.config.js

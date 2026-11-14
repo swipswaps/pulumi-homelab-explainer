@@ -16,7 +16,5 @@ services:
       retries: 5
       start_period: 15s
 
-  # Optional: add services that depend on backend here with depends_on: backend: condition: service_healthy
-
 volumes:
   pulumi_sqlite_data:

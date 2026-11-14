@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
+const LOCAL_INSTANCE_URL = 'http://localhost:5173';
 
 const INITIAL_SNAPSHOTS = [
   {
@@ -40,7 +41,12 @@ export default function App() {
   const [ignoreDiskSpeed, setIgnoreDiskSpeed] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
-  const isHttps = window.location.protocol === 'https:';
+
+  // Environment detection
+  const isLocalhost = typeof window !== 'undefined' &&
+    ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const showRemoteBanner = !isLocalhost && isHttps;
 
   const probeBackend = useCallback(async (targetUrl) => {
     const url = targetUrl || backendUrl;
@@ -80,20 +86,20 @@ export default function App() {
   const handleCommitSnapshot = async (e) => {
     e.preventDefault();
     const urn = `urn:pulumi:${stackName}::homelab::proxmoxve:index/vmLegacy:VmLegacy::server-${stackName}-${vmId}`;
-    const statePayload = { vm_id: Number(vmId), memory_mb: Number(vmMemory), cores: Number(vmCores), reboot_after_update: rebootAfterUpdate, ignore_changes: ignoreDiskSpeed ? ['disks[0].speed'] : [] };
+    const statePayload = { vm_id: Number(vmId), memory_mb: Number(vmMemory), cores: Number(vmMemory), reboot_after_update: rebootAfterUpdate, ignore_changes: ignoreDiskSpeed ? ['disks[0].speed'] : [] };
 
     if (backendConnected) {
       try {
         const res = await fetch(`${backendUrl}/api/snapshots`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ stack_name: stackName, vm_id: Number(vmId), memory_mb: Number(vmMemory), cores: Number(vmCores), reboot_after_update: rebootAfterUpdate, ignore_disk_speed: ignoreDiskSpeed, notes: `Simulated ${stackName} update` })
+          body: JSON.stringify({ stack_name: stackName, vm_id: Number(vmId), memory_mb: Number(vmMemory), cores: 4, reboot_after_update: rebootAfterUpdate, ignore_disk_speed: ignoreDiskSpeed, notes: `Simulated ${stackName} update` })
         });
         if (res.ok) { probeBackend(backendUrl); return; }
       } catch {}
     }
 
-    setSnapshots(prev => [{ id: Date.now(), stack_name: stackName, urn, resource_type: 'proxmoxve:index/vmLegacy:VmLegacy', vm_id: Number(vmId), memory_mb: Number(vmMemory), cores: Number(vmCores), reboot_after_update: rebootAfterUpdate ? 1 : 0, ignore_disk_speed: ignoreDiskSpeed ? 1 : 0, secret_provider: 'infisical-sdk', state_json: JSON.stringify(statePayload), created_at: new Date().toISOString() }, ...prev]);
+    setSnapshots(prev => [{ id: Date.now(), stack_name: stackName, urn, resource_type: 'proxmoxve:index/vmLegacy:VmLegacy', vm_id: Number(vmId), memory_mb: Number(vmMemory), cores: 4, reboot_after_update: rebootAfterUpdate ? 1 : 0, ignore_disk_speed: ignoreDiskSpeed ? 1 : 0, secret_provider: 'infisical-sdk', state_json: JSON.stringify(statePayload), created_at: new Date().toISOString() }, ...prev]);
   };
 
   const handleHybridSearch = async (e) => {
@@ -179,7 +185,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${backendConnected ? 'border-emerald-700 bg-emerald-950/70 text-emerald-300' : 'border-amber-700 bg-amber-950/70 text-amber-300'}`}>
               <span className={`h-2 w-2 rounded-full ${backendConnected ? 'animate-pulse bg-emerald-400' : 'bg-amber-400'}`} />
-              <span>{probing ? 'Probing...' : backendConnected ? `Docker: ${backendUrl}` : `Offline (${backendUrl})`}</span>
+              <span>{probing ? 'Probing...' : backendConnected ? `Docker Backend Detected (${backendUrl})` : `Offline (${backendUrl})`}</span>
             </div>
             <button type="button" onClick={() => probeBackend(backendUrl)} className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700">
               <RefreshCw className={`h-3.5 w-3.5 ${probing ? 'animate-spin' : ''}`} /> Re-probe
@@ -188,16 +194,37 @@ export default function App() {
         </div>
       </header>
 
-      {isHttps && !backendConnected && (
-        <div className="bg-slate-900 border-b border-slate-800 px-6 py-3 text-xs text-slate-300 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
-            <span>HTTPS blocks HTTP loopback. Use Cloudflare Tunnel: cloudflared tunnel --url http://localhost:8000</span>
-          </div>
-          <form onSubmit={handleSaveBackendUrl} className="flex gap-2">
-            <input type="text" value={customUrlInput} onChange={e => setCustomUrlInput(e.target.value)} className="bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 w-64 font-mono" placeholder="https://tunnel.example.com" />
-            <button type="submit" className="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded text-xs font-semibold">Set</button>
-          </form>
+      {showRemoteBanner && (
+        <div className="bg-slate-900 border-b border-slate-800 px-6 py-3 text-xs">
+          {backendConnected ? (
+            <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                <span className="text-emerald-300">Backend connected via {backendUrl}</span>
+              </div>
+              <a href={LOCAL_INSTANCE_URL} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold whitespace-nowrap">
+                Switch to Local Instance &rarr;
+              </a>
+            </div>
+          ) : (
+            <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="text-slate-300">
+                  GitHub Pages (HTTPS) blocks HTTP loopback probes. For full Docker vector search, open the local instance:
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a href={LOCAL_INSTANCE_URL} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold whitespace-nowrap">
+                  Open Local Instance &rarr;
+                </a>
+                <form onSubmit={handleSaveBackendUrl} className="flex gap-1.5">
+                  <input type="text" value={customUrlInput} onChange={e => setCustomUrlInput(e.target.value)} placeholder="https://tunnel.example.com" className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 w-48 font-mono" />
+                  <button type="submit" className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs">Set Tunnel</button>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -281,7 +308,7 @@ export default function App() {
                 <div key={s.id} className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs font-mono space-y-1">
                   <div className="flex justify-between text-sky-400"><span>stack: {s.stack_name}</span><span>VM {s.vm_id}</span></div>
                   <div className="text-slate-300 break-all text-[11px]">{s.urn}</div>
-                  <div className="text-slate-500 text-[11px]">RAM: {s.memory_mb}MB &bull; Cores: {s.cores}</div>
+                  <div className="text-slate-500 text-[11px]">RAM: {s.memory_mb}MB</div>
                 </div>
               ))}
             </div>

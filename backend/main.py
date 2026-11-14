@@ -29,7 +29,6 @@ def serialize_f32(vector: List[float]) -> bytes:
     return struct.pack(f"<{len(vector)}f", *vector)
 
 def get_db_connection() -> sqlite3.Connection:
-    """Per-request connection – do NOT share across threads."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH), timeout=30.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -90,7 +89,7 @@ async def lifespan(app: FastAPI):
     init_database()
     yield
 
-app = FastAPI(title="Pulumi Homelab Backend", version="1.3.0", lifespan=lifespan)
+app = FastAPI(title="Pulumi Homelab Backend", version="1.4.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 
 class SnapshotCreateRequest(BaseModel):

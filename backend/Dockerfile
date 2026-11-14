@@ -6,7 +6,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Native libs required by sqlite_vec precompiled extension
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libsqlite3-0 libgcc-s1 libstdc++6 curl && \
