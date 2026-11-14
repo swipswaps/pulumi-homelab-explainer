@@ -2,7 +2,8 @@
 #
 # Upgraded One-shot Idempotent Scaffold & Runner: Pulumi Homelab & Proxmox Explainer
 # Dual-plane: GitHub Pages static explainer + local Docker SQLite-vec backend
-# Features: Polling GitHub Pages deployment status via gh api until 200 OK before opening.
+# Features: Automated Docker container build/up, health probe validation,
+#           and GitHub Pages deployment polling via gh api until 200 OK.
 #
 # Shell-safe constraints: no sed, no set -e, no exit 1, no stderr swallowing.
 # -----------------------------------------------------------------------------
@@ -989,7 +990,7 @@ BACKUPEOF
 chmod +x scripts/backup_db.sh
 
 # =============================================================================
-# AUTO-EXECUTION & BUILD ORCHESTRATION WITH `gh api` STATUS POLLING
+# AUTO-EXECUTION & LOCAL DOCKER VALIDATION & GITHUB PAGES POLLING
 # =============================================================================
 info "Installing frontend npm dependencies..."
 npm install
@@ -997,8 +998,22 @@ npm install
 info "Building frontend static assets..."
 npm run build
 
-info "Starting Docker backend container..."
+info "Building and starting local Docker backend container..."
 docker compose up --build -d
+
+info "Testing local Docker backend health and API endpoints..."
+CONTAINER_TEST_ATTEMPTS=0
+CONTAINER_MAX_ATTEMPTS=15
+while [ $CONTAINER_TEST_ATTEMPTS -lt $CONTAINER_MAX_ATTEMPTS ]; do
+  HEALTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8000/api/health" || echo "000")
+  info "Docker health probe attempt $((CONTAINER_TEST_ATTEMPTS+1))/$CONTAINER_MAX_ATTEMPTS: HTTP Status: $HEALTH_CODE"
+  if [ "$HEALTH_CODE" = "200" ]; then
+    ok "Docker backend is healthy and responding!"
+    break
+  fi
+  CONTAINER_TEST_ATTEMPTS=$((CONTAINER_TEST_ATTEMPTS+1))
+  sleep 2
+done
 
 info "Initializing git repository and committing..."
 if [ ! -d .git ]; then
@@ -1018,7 +1033,7 @@ while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
   HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${GITHUB_PAGES_URL}" || echo "000")
   GH_API_JSON=$(gh api "repos/${GH_USER}/${REPO_NAME}/pages" 2>/dev/null || echo "{}")
   
-  info "Attempt $((ATTEMPTS+1))/$MAX_ATTEMPTS: HTTP Status: $HTTP_STATUS | GitHub API Response: $GH_API_JSON"
+  info "Attempt $((ATTEMPTS+1))/$MAX_ATTEMPTS: GitHub Pages HTTP Status: $HTTP_STATUS | GitHub API Pages JSON: $GH_API_JSON"
   
   if [ "$HTTP_STATUS" = "200" ]; then
     ok "GitHub Pages is live and returning 200 OK!"
