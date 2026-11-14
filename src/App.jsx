@@ -15,10 +15,11 @@ import {
   AlertTriangle,
   PlusCircle,
   Database,
-  Search
+  Search,
+  Sliders
 } from 'lucide-react';
 
-const BACKEND_URL = 'http://127.0.0.1:8000';
+const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
 
 const INITIAL_SNAPSHOTS = [
   {
@@ -39,6 +40,8 @@ const INITIAL_SNAPSHOTS = [
 
 export default function App() {
   const mountRef = useRef(null);
+  const [backendUrl, setBackendUrl] = useState(() => localStorage.getItem('pulumi_backend_url') || DEFAULT_BACKEND_URL);
+  const [customUrlInput, setCustomUrlInput] = useState(backendUrl);
   const [backendConnected, setBackendConnected] = useState(false);
   const [probing, setProbing] = useState(true);
   const [backendMeta, setBackendMeta] = useState(null);
@@ -58,12 +61,13 @@ export default function App() {
   const [searchResults, setSearchResults] = useState(null);
   const isHttps = window.location.protocol === 'https:';
 
-  const probeBackend = useCallback(async () => {
+  const probeBackend = useCallback(async (targetUrl) => {
+    const urlToTest = targetUrl || backendUrl;
     setProbing(true);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
+    const timeout = setTimeout(() => controller.abort(), 2000);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/health`, {
+      const res = await fetch(`${urlToTest}/api/health`, {
         signal: controller.signal,
         headers: { Accept: 'application/json' }
       });
@@ -72,7 +76,7 @@ export default function App() {
         const data = await res.json();
         setBackendConnected(true);
         setBackendMeta(data);
-        const listRes = await fetch(`${BACKEND_URL}/api/snapshots?limit=25`);
+        const listRes = await fetch(`${urlToTest}/api/snapshots?limit=25`);
         if (listRes.ok) {
           const listData = await listRes.json();
           setSnapshots(listData);
@@ -88,17 +92,24 @@ export default function App() {
     } finally {
       setProbing(false);
     }
-  }, []);
+  }, [backendUrl]);
 
   useEffect(() => {
-    probeBackend();
-  }, [probeBackend]);
+    probeBackend(backendUrl);
+  }, [backendUrl, probeBackend]);
 
   useEffect(() => {
     if (!backendConnected) {
       localStorage.setItem('pulumi_homelab_snapshots', JSON.stringify(snapshots));
     }
   }, [snapshots, backendConnected]);
+
+  const handleSaveBackendUrl = (e) => {
+    e.preventDefault();
+    localStorage.setItem('pulumi_backend_url', customUrlInput);
+    setBackendUrl(customUrlInput);
+    probeBackend(customUrlInput);
+  };
 
   const handleCommitSnapshot = async (e) => {
     e.preventDefault();
@@ -113,7 +124,7 @@ export default function App() {
 
     if (backendConnected) {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/snapshots`, {
+        const res = await fetch(`${backendUrl}/api/snapshots`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -127,7 +138,7 @@ export default function App() {
           })
         });
         if (res.ok) {
-          probeBackend();
+          probeBackend(backendUrl);
           return;
         }
       } catch {
@@ -158,7 +169,7 @@ export default function App() {
 
     if (backendConnected) {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(searchQuery.trim())}`);
+        const res = await fetch(`${backendUrl}/api/search?q=${encodeURIComponent(searchQuery.trim())}`);
         if (res.ok) {
           const data = await res.json();
           setSearchResults(data);
@@ -283,9 +294,9 @@ export default function App() {
               backendConnected ? 'border-emerald-700 bg-emerald-950/70 text-emerald-300' : 'border-amber-700 bg-amber-950/70 text-amber-300'
             }`}>
               <span className={`h-2 w-2 rounded-full ${backendConnected ? 'animate-pulse bg-emerald-400' : 'bg-amber-400'}`} />
-              <span>{probing ? 'Probing backend...' : backendConnected ? 'Docker Backend Detected (SQLite-Vec)' : 'Static GitHub Pages Mode (LocalStorage)'}</span>
+              <span>{probing ? 'Probing backend...' : backendConnected ? `Docker Backend Connected (${backendUrl})` : `Offline Mode (Probed: ${backendUrl})`}</span>
             </div>
-            <button type="button" onClick={probeBackend} className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-slate-700">
+            <button type="button" onClick={() => probeBackend(backendUrl)} className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-slate-700">
               <RefreshCw className={`h-3.5 w-3.5 ${probing ? 'animate-spin' : ''}`} />
               Re-probe
             </button>
@@ -294,9 +305,15 @@ export default function App() {
       </header>
 
       {isHttps && !backendConnected && (
-        <div className="bg-amber-900/40 border-b border-amber-700/50 px-6 py-2.5 text-xs text-amber-200 text-center flex items-center justify-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
-          <span>Notice: HTTPS GitHub Pages active. Browser blocks HTTP probes. LocalStorage offline persistence active. Run <code className="bg-slate-900 px-1 rounded">npm run dev</code> locally for Docker integration.</span>
+        <div className="bg-slate-900 border-b border-slate-800 px-6 py-3 text-xs text-slate-300 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+            <span>HTTPS active. Browsers block mixed content (HTTP loopback). To connect local Docker backend, use a local proxy or update endpoint:</span>
+          </div>
+          <form onSubmit={handleSaveBackendUrl} className="flex gap-2">
+            <input type="text" value={customUrlInput} onChange={(e) => setCustomUrlInput(e.target.value)} className="bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-100 w-56 font-mono" />
+            <button type="submit" className="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded text-xs font-semibold">Set Backend</button>
+          </form>
         </div>
       )}
 
