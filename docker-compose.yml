@@ -1,0 +1,15 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pulumi-homelab-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - pulumi_sqlite_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  pulumi_sqlite_data:
