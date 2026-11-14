@@ -9,7 +9,14 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - pulumi_sqlite_data:/data
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  # Optional: add services that depend on backend here with depends_on: backend: condition: service_healthy
 
 volumes:
   pulumi_sqlite_data:

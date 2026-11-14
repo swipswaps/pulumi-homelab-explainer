@@ -1,10 +1,27 @@
 FROM python:3.12-slim-bookworm
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SQLITE_DB_PATH=/data/pulumi_state_audit.db
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    SQLITE_DB_PATH=/data/pulumi_state_audit.db
+
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends libsqlite3-0 curl && rm -rf /var/lib/apt/lists/*
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
-COPY main.py /app/main.py
+
+# Native libs required by sqlite_vec precompiled extension
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libsqlite3-0 libgcc-s1 libstdc++6 curl && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY main.py .
+
 RUN mkdir -p /data
+
 EXPOSE 8000
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=5 \
+  CMD curl -fsS http://127.0.0.1:8000/api/health || exit 1
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

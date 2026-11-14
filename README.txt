@@ -6,45 +6,39 @@ LIVE DEMO: https://swipswaps.github.io/pulumi-homelab-explainer/
 
 HOW WE GOT HERE & WHERE WE ARE
 --------------------------------
-This repository establishes a dual-plane infrastructure explainer auditing Christian
-Lempa's Pulumi + Proxmox + Infisical homelab architecture (YouTube: WFyJ-xyJ58M).
-It combines a zero-backend static React/Vite/Three.js site on GitHub Pages with a local
-Docker plane running FastAPI, SQLite WAL with sqlite-vec vector similarity search, 
-and FTS5 lexical search.
+Dual-plane explainer auditing Christian Lempa's Pulumi + Proxmox + Infisical
+homelab architecture (YouTube: WFyJ-xyJ58M). Static React/Vite/Three.js site on
+GitHub Pages + local Docker FastAPI backend with SQLite WAL + sqlite-vec + FTS5.
 
-OFFLINE PERSISTENCE & MIXED CONTENT
-------------------------------------
-When viewing via GitHub Pages (HTTPS), modern browsers block HTTP loopback requests
-to http://127.0.0.1:8000. In static mode, the UI seamlessly falls back to browser 
-localStorage persistence so your custom resource snapshots are never lost.
-To run full local Docker mode:
-  1. npm run dev (http://localhost:5173)
-  2. docker compose up --build -d
+STATIC MODE (GitHub Pages):
+  Works immediately at the live demo URL. Falls back to localStorage persistence
+  when no local backend is reachable.
 
-DIRECTORY STRUCTURE
---------------------
-  README.txt                    This operational documentation
-  package.json                  Frontend dependencies
-  vite.config.js                Vite configuration (relative base for Pages)
-  tailwind.config.js            Tailwind CSS content scanning
-  postcss.config.js             PostCSS pipeline
-  index.html                    Entry HTML document
-  src/main.jsx                  React mount root
-  src/index.css                 Tailwind directives and resets
-  src/App.jsx                   3D Topology UI, backend detector, local storage
-  backend/requirements.txt      Python dependencies (FastAPI, sqlite-vec, pulumi)
-  backend/main.py               FastAPI backend with WAL and vector/lexical search
-  docker-compose.yml            Local multi-container orchestration
-  scripts/bootstrap_gh_pages.sh GitHub repo & Pages automation via gh api
-  scripts/backup_db.sh          SQLite WAL vacuum and point-in-time backup
-  .github/workflows/deploy.yml  GitHub Actions Pages deployment workflow
+LOCAL DOCKER MODE (full vector search):
+  1. docker compose up --build -d
+  2. curl http://127.0.0.1:8000/api/health   # should return {"status":"ok",...}
+  3. npm run dev                              # http://localhost:5173
+  4. The UI status badge will show "Docker Backend Detected".
 
-VERIFIED REFERENCES
--------------------
-[1] Pulumi State & Backends: https://www.pulumi.com/docs/concepts/state/
-[2] bpg/proxmox provider schema: https://registry.terraform.io/providers/bpg/proxmox/latest/docs
-[3] sqlite-vec vector search: https://github.com/asg017/sqlite-vec
-[4] SQLite Write-Ahead Logging: https://www.sqlite.org/wal.html
-[5] Kleppmann, M. (2017). Designing Data-Intensive Applications. ISBN 978-1449373320.
+GITHUB PAGES DEPLOYMENT:
+  The workflow (.github/workflows/deploy.yml) uses actions/configure-pages,
+  actions/upload-pages-artifact, and actions/deploy-pages. It requires the
+  repository's Pages source to be set to "GitHub Actions" (one-time manual step
+  in Settings → Pages). The bootstrap script detects a 403 from gh api and prints
+  the correct instruction.
+
+DIRECTORY STRUCTURE:
+  package.json, vite.config.js, tailwind.config.js, postcss.config.js
+  index.html, src/main.jsx, src/index.css, src/App.jsx
+  backend/requirements.txt, backend/main.py, backend/Dockerfile
+  docker-compose.yml, .github/workflows/deploy.yml
+  scripts/bootstrap_gh_pages.sh, scripts/backup_db.sh
+
+VERIFIED REFERENCES:
+  [1] Pulumi State: https://www.pulumi.com/docs/concepts/state/
+  [2] bpg/proxmox provider: https://registry.terraform.io/providers/bpg/proxmox/latest/docs
+  [3] sqlite-vec: https://github.com/asg017/sqlite-vec
+  [4] SQLite WAL: https://www.sqlite.org/wal.html
+  [5] Kleppmann (2017) DDIA, ISBN 978-1449373320.
 
 ================================================================================
